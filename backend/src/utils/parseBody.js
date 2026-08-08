@@ -54,16 +54,21 @@ async function parseBody(req, { maxBytes = MAX_BYTES } = {}) {
       totalBytes += chunk.length;
 
       if (totalBytes > maxBytes) {
-        // Abort stream immediately; 'error' event will fire but we guard it.
-        fail(new ParseError(
-          `Request body exceeds the ${maxBytes / 1024} KB size limit`,
-          413,
-        ));
-        req.destroy();
+        // Stop accumulating but do NOT call req.destroy() — that tears down
+        // the TCP socket before app.js can write the 413 response.
+        // Instead, drain the remainder of the incoming stream silently.
+        if (!settled) {
+          settled = true;
+          req.resume(); // discard remaining bytes
+          reject(new ParseError(
+            `Request body exceeds the ${maxBytes / 1024} KB size limit`,
+            413,
+          ));
+        }
         return;
       }
 
-      chunks.push(chunk);
+      if (!settled) chunks.push(chunk);
     });
 
     req.on("error", (err) => {
