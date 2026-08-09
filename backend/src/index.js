@@ -11,6 +11,9 @@
 
 "use strict";
 
+// Load .env FIRST — before any other require() that reads process.env.
+require("dotenv").config();
+
 const { createApp } = require("./app");
 const config        = require("./config");
 

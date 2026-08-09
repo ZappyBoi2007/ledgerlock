@@ -2,24 +2,38 @@
  * src/routes/index.js
  *
  * Route registry for the LedgerLock API.
- * Maps "METHOD /path" strings to controller functions.
- * The app.js dispatcher looks up routes from this Map.
  *
+ * Two Maps are exported:
+ *   routes       – exact "METHOD /path" → handler  (health, upload)
+ *   prefixRoutes – "METHOD /path/prefix" → handler  (path-param routes)
+ *
+ * app.js checks exact routes first, then prefix routes.
  * Keep this file simple: one line per route.
- * Business logic belongs in controllers; HTTP plumbing belongs in app.js.
  */
 
 "use strict";
 
-const { handleHealth } = require("../controllers/healthController");
-const { handleUpload } = require("../controllers/uploadController");
+const { handleHealth }              = require("../controllers/healthController");
+const { handleUpload }              = require("../controllers/uploadController");
+const { handleNotarise, handleVerify } = require("../controllers/certificateController");
 
 /**
- * @type {Map<string, (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => Promise<void>>}
+ * Exact route lookup — used for routes with no path parameters.
+ * @type {Map<string, Function>}
  */
 const routes = new Map([
-  ["GET /api/v1/health", handleHealth],
-  ["POST /api/v1/upload", handleUpload],
+  ["GET /api/v1/health",    handleHealth],
+  ["POST /api/v1/upload",   handleUpload],
+  ["POST /api/v1/certificates", handleNotarise],
 ]);
 
-module.exports = { routes };
+/**
+ * Prefix route lookup — used for routes containing path parameters.
+ * app.js iterates these and matches if the request key starts with the prefix.
+ * @type {Map<string, Function>}
+ */
+const prefixRoutes = new Map([
+  ["GET /api/v1/certificates/", handleVerify],
+]);
+
+module.exports = { routes, prefixRoutes };

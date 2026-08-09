@@ -6,7 +6,8 @@
  *
  * Mapping strategy:
  *   AppError (ParseError, ValidationError) → use their own statusCode
- *   PinataError                            → 502 Bad Gateway (upstream failure)
+ *   PinataError                            → 502 Bad Gateway (IPFS failure)
+ *   BlockchainError                        → 502 Bad Gateway (blockchain failure)
  *   Unknown Error                          → 500 Internal Server Error
  *
  * Errors are never swallowed; unknown ones are logged to stderr.
@@ -14,9 +15,10 @@
 
 "use strict";
 
-const { sendError }   = require("../utils/response");
-const { AppError }    = require("../utils/errors");
-const { PinataError } = require("../services/pinataService");
+const { sendError }        = require("../utils/response");
+const { AppError }         = require("../utils/errors");
+const { PinataError }      = require("../services/pinataService");
+const { BlockchainError }  = require("../services/blockchainService");
 
 /**
  * @param {Error}                               err
@@ -29,8 +31,12 @@ function handleError(err, res) {
   }
 
   if (err instanceof PinataError) {
-    // Always surface as 502 — the client request was valid; Pinata is the issue.
     sendError(res, 502, `IPFS upload failed: ${err.message}`);
+    return;
+  }
+
+  if (err instanceof BlockchainError) {
+    sendError(res, 502, `Blockchain operation failed: ${err.message}`);
     return;
   }
 

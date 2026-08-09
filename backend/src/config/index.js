@@ -29,9 +29,12 @@ const config = {
   },
 
   // ── Blockchain ───────────────────────────────────────────────────────────────
-  rpcUrl:          process.env.RPC_URL          || "",
-  chainId:         process.env.CHAIN_ID         || "",
-  contractAddress: process.env.CONTRACT_ADDRESS || "",
+  // Getters so tests can set env vars before calling createBlockchainService().
+  get rpcUrl()             { return process.env.RPC_URL          || ""; },
+  get chainId()            { return process.env.CHAIN_ID         || ""; },
+  get contractAddress()    { return process.env.CONTRACT_ADDRESS || ""; },
+  /** Private key for the backend signing wallet. NEVER log or expose this. */
+  get blockchainPrivateKey() { return process.env.BLOCKCHAIN_PRIVATE_KEY || ""; },
 
   // ── Auth ─────────────────────────────────────────────────────────────────────
   jwtSecret:    process.env.JWT_SECRET    || "",

@@ -7,7 +7,10 @@
  * Architecture:
  *   createApp()  →  http.Server
  *     ↓ each request
- *   routes Map lookup  (routes/index.js)
+ *   CORS preflight / headers
+ *     ↓
+ *   Exact route lookup (routes Map)
+ *   OR prefix route lookup (prefixRoutes Map, for path-param routes)
  *     ↓ found
  *   controller(req, res)
  *     ↓ throws
@@ -22,9 +25,10 @@
 
 const http = require("node:http");
 
-const { routes }       = require("./routes");
-const { handleError }  = require("./middleware/errorHandler");
-const { sendError }    = require("./utils/response");
+const { routes, prefixRoutes } = require("./routes");
+const { handleError }          = require("./middleware/errorHandler");
+const { sendError }            = require("./utils/response");
+const config                   = require("./config");
 
 /**
  * Create and return a configured http.Server.
@@ -34,8 +38,35 @@ const { sendError }    = require("./utils/response");
  */
 function createApp() {
   return http.createServer(async (req, res) => {
-    const key     = `${req.method} ${req.url}`;
-    const handler = routes.get(key);
+    // ── CORS headers (always, including preflight) ──────────────────────────
+    const origin = req.headers["origin"] || "";
+    const allowed = config.allowedOrigins.includes(origin) ? origin : config.allowedOrigins[0];
+
+    res.setHeader("Access-Control-Allow-Origin", allowed);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    // ── Route lookup ─────────────────────────────────────────────────────────
+    const key = `${req.method} ${req.url}`;
+
+    // 1. Exact match (health, upload, etc.)
+    let handler = routes.get(key);
+
+    // 2. Prefix match (path-param routes like GET /api/v1/certificates/:certId)
+    if (!handler) {
+      for (const [prefix, h] of prefixRoutes) {
+        if (key.startsWith(prefix)) {
+          handler = h;
+          break;
+        }
+      }
+    }
 
     // ── 404 for unknown routes ──────────────────────────────────────────────
     if (!handler) {
